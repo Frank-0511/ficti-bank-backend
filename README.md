@@ -2,9 +2,22 @@
 
 Backend bancario con FastAPI y SQLAlchemy
 
-## Requisitos previos (macOS)
+## Requisitos previos
 
 - Python 3.12
+- MySQL y headers de desarrollo
+- pkg-config
+
+### Linux (Ubuntu/Debian)
+
+Instala las dependencias del sistema necesarias para compilar `mysqlclient`:
+```bash
+sudo apt update
+sudo apt install -y pkg-config libmysqlclient-dev python3.12-dev
+```
+
+### macOS
+
 - [Homebrew](https://brew.sh/)
 - MySQL y pkg-config (para compilar mysqlclient)
 
