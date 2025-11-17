@@ -28,3 +28,7 @@ class UserFromDB(SQLModel):
     HashedPassword: str
     Rol: str
     Estado: str
+    email: str
+    codcliente: str
+    nombre_completo: str
+    
