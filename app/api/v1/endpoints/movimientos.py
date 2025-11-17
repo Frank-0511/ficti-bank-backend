@@ -1,20 +1,22 @@
 # app/api/v1/endpoints/movimientos.py
 
-from fastapi import APIRouter, HTTPException, status, Depends
-import traceback  
+from fastapi import APIRouter, HTTPException, status, Depends, Query
+import traceback
 from typing import List
 
-# --- Importaciones de dependencias ---
-from app.api.v1.deps import SessionDep, get_current_user
-from app.schemas.util import APIResponse 
-from app.schemas.user import UserFromDB  # Para obtener el usuario del token
-from app.schemas.movimientos import MovimientoDelDia  # Nuestro nuevo schema
-from app.services import movimientos_service  # Nuestro nuevo servicio
-from fastapi.param_functions import Query
+# Importaciones internas
+from app.api.v1.deps import SessionDep
+from app.schemas.util import APIResponse
+from app.schemas.movimientos import MovimientoDelDia
+from app.services import movimientos_service
+
 
 router = APIRouter()
 
 
+# ============================================================
+#   1. Movimientos del día (SP existente)
+# ============================================================
 @router.get(
     "/getMovimientosDelDia",
     response_model=APIResponse,
@@ -24,36 +26,85 @@ router = APIRouter()
 def listar_movimientos_del_dia(
     *,
     session: SessionDep,
-    # current_user: UserFromDB=Depends(get_current_user)  # Protegido
     Cod_usu: str = Query(..., description="Código del usuario que consulta."),
-    rol: str = Query(..., max_length=1, description="Rol del usuario (ej: 'A', 'C').")
+    rol: str = Query(..., max_length=1, description="Rol del usuario (A=Admin, C=Cliente)."),
 ):
     """
-    Recupera los movimientos bancarios registrados en el día actual (CURDATE()).
-    - Si el usuario es Admin (Rol='A'), verá todos los movimientos.
-    - Si no es Admin, solo verá los movimientos registrados por él mismo.
+    Obtiene los movimientos registrados en la fecha actual.
+    Rol A: Admin → ve todo
+    Rol C: Cliente → solo ve sus propios movimientos
     """
     try:
-        # 1. Llama al servicio pasando los datos del token
-        lista_movimientos: List[MovimientoDelDia] = movimientos_service.listar_movimientos_del_dia_sp(
+        lista = movimientos_service.listar_movimientos_del_dia_sp(
             session=session,
             cod_usu=Cod_usu,
             rol=rol
         )
-        
-        # 2. Respuesta de Éxito
+
         return APIResponse(
-            mensaje=f"Consulta exitosa. Se encontraron {len(lista_movimientos)} movimientos.",
+            mensaje=f"Consulta exitosa. Se encontraron {len(lista)} movimientos.",
             codigo="LIST-OK",
             status_code=status.HTTP_200_OK,
-            result=lista_movimientos  # <-- Aquí va la lista de movimientos
+            result=lista
         )
-    
+
     except Exception as e:
-        # 3. Manejo de Errores Internos
-        print("🔴 ERROR INESPERADO AL LISTAR MOVIMIENTOS:", e)
+        print("🔴 ERROR INESPERADO AL LISTAR MOVIMIENTOS DEL DÍA:", e)
         traceback.print_exc()
-        
+
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=APIResponse(
+                mensaje="Ocurrió un error interno del servidor.",
+                codigo="SYS-500",
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+            ).model_dump()
+        )
+
+
+# ============================================================
+#   2. Últimos 20 movimientos (NUEVO SP)
+# ============================================================
+@router.get(
+    "/getLastMovimientosByCuenta",
+    response_model=APIResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Obtiene los últimos 20 movimientos de una cuenta bancaria."
+)
+def listar_ultimos_movimientos(
+    *,
+    session: SessionDep,
+    nro_cuenta: str = Query(..., description="Número de cuenta. Ejemplo: CA-1088340")
+):
+    """
+    Recupera los últimos 20 movimientos históricos de una cuenta,
+    ordenados desde el más reciente al más antiguo.
+    """
+    try:
+        lista = movimientos_service.listar_ultimos_movimientos_sp(
+            session=session,
+            nro_cuenta=nro_cuenta
+        )
+
+        if not lista:
+            return APIResponse(
+                mensaje="No se encontraron movimientos para esta cuenta.",
+                codigo="MOV-404",
+                status_code=status.HTTP_200_OK,
+                result=[]
+            )
+
+        return APIResponse(
+            mensaje=f"Consulta exitosa. Se encontraron {len(lista)} movimientos.",
+            codigo="MOV-OK",
+            status_code=status.HTTP_200_OK,
+            result=lista
+        )
+
+    except Exception as e:
+        print("🔴 ERROR INESPERADO AL LISTAR ÚLTIMOS MOVIMIENTOS:", e)
+        traceback.print_exc()
+
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=APIResponse(

@@ -3,12 +3,12 @@
 from sqlmodel import SQLModel
 from decimal import Decimal
 from datetime import date
-from typing import Optional
 
 
 class MovimientoDelDia(SQLModel):
     """
-    Schema para los movimientos del día devueltos por el SP.
+    Schema para los movimientos devueltos por el stored procedure
+    (últimos 20 o movimientos del día).
     """
     Fech_Ope: date
     NroCta: str
