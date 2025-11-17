@@ -1,30 +1,52 @@
-from typing import Optional
+from typing import Optional, Literal
 from sqlmodel import SQLModel, Field
 
+# ---------------------------------------------------------
+# ROLES PERMITIDOS (A = Admin, E = Empleado, C = Cliente)
+# ---------------------------------------------------------
+RolType = Literal["A", "E", "C"]
 
+
+# ---------------------------------------------------------
+# BASE (Campos comunes)
+# ---------------------------------------------------------
 class UsuarioBase(SQLModel):
     Usuario: str
-    Rol: str  # Ej: 'A' o 'E'
+    Rol: RolType  # VALIDADO → Solo A, E o C
 
 
+# ---------------------------------------------------------
+# PARA CREAR USUARIO
+# ---------------------------------------------------------
 class UsuarioCreate(UsuarioBase):
-    CodUsu: str  # El código se genera/asigna al crear
+    CodUsu: str
     Password: str = Field(..., min_length=1)
 
 
+# ---------------------------------------------------------
+# PARA MOSTRAR USUARIO EN RESPUESTAS
+# ---------------------------------------------------------
 class UsuarioPublic(UsuarioBase):
     CodUsu: str
-    Usuario: str
-    Rol: str
     Estado: str
 
+
+# ---------------------------------------------------------
+# PARA LEER USUARIO DESDE LA BD (incluyendo hash)
+# ---------------------------------------------------------
 class UserFromDB(SQLModel):
-    """
-    Schema para los datos del usuario tal como se reciben desde la base de datos,
-    incluyendo la contraseña hasheada para la verificación.
-    """
     CodUsu: str
     Usuario: str
     HashedPassword: str
-    Rol: str
+    Rol: RolType
     Estado: str
+
+
+# ---------------------------------------------------------
+# PARA ACTUALIZAR USUARIO (parcial)
+# ---------------------------------------------------------
+class UsuarioUpdate(SQLModel):
+    Usuario: Optional[str] = None
+    Rol: Optional[RolType] = None    # VALIDADO →
+    Estado: Optional[str] = None
+    Password: Optional[str] = Field(default=None, min_length=1)
