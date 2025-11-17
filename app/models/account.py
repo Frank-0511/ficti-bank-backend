@@ -1,39 +1,39 @@
-from typing import Optional, List
-from sqlmodel import Field, SQLModel, Relationship
+from typing import Optional
+from sqlmodel import Field, SQLModel
 from datetime import date
 from decimal import Decimal
-from app.models.user import Usuario
-from app.models.client import Cliente
 
 
 class Cuenta(SQLModel, table=True):
-    __tablename__ = "T_Cuentas"
+    __tablename__ = "t_cuentas"
     
     NroCta: str = Field(primary_key=True, max_length=20)
-    TipoCta: Optional[str] = Field(default=None, max_length=2, foreign_key="T_TipoCuentas.TipoCta")
-    CodCliente: Optional[str] = Field(default=None, max_length=10, foreign_key="T_Cliente.CodCliente")
+    TipoCta: Optional[str] = Field(default=None, max_length=2, foreign_key="t_tipocuentas.TipoCta")
+    CodCliente: Optional[str] = Field(default=None, max_length=10, foreign_key="t_cliente.CodCliente")
+
     Moneda: Optional[str] = Field(default=None, max_length=2)
     Fech_Apert: Optional[date] = None
+    Fech_Cierre: Optional[date] = None
+    Fech_Bloq: Optional[date] = None
+    Fech_Ult_M: Optional[date] = None
+
+    Saldoni: Optional[Decimal] = Field(default=0.0, max_digits=10, decimal_places=2)
     SaldAct: Optional[Decimal] = Field(default=0.0, max_digits=10, decimal_places=2)
-    Estado: Optional[str] = Field(default=None, max_length=1, foreign_key="T_Estado.Estado")
+    SaldoPro: Optional[Decimal] = Field(default=0.0, max_digits=10, decimal_places=2)
 
-    # Foreign Key al usuario que la registró
-    CodUsu: Optional[str] = Field(default=None, foreign_key="T_Usuario.CodUsu")
-
-    # Relaciones
-    cliente: Optional[Cliente] = Relationship(back_populates="cuentas")
-    usuario_registrador: Optional[Usuario] = Relationship(back_populates="cuentas_registradas")
+    CodUsu: Optional[str] = Field(default=None, foreign_key="t_usuario.CodUsu")
+    Estado: Optional[str] = Field(default=None, max_length=1, foreign_key="t_estado.Estado")
 
 
 class Movimiento(SQLModel, table=True):
-    __tablename__ = "T_Movimientos"
-    
-    # Clave primaria compuesta
-    NroCta: str = Field(primary_key=True, max_length=20, foreign_key="T_Cuentas.NroCta")
+    __tablename__ = "t_movimientos"
+
+    TipoCta: str = Field(primary_key=True, max_length=2, foreign_key="t_tipocuentas.TipoCta")
+    NroCta: str = Field(primary_key=True, max_length=20, foreign_key="t_cuentas.NroCta")
     NroOperNumber: int = Field(primary_key=True)
-    
+
     Fech_Ope: Optional[date] = None
-    CodUsu: Optional[str] = Field(default=None, max_length=10, foreign_key="T_Usuario.CodUsu")
-    TipoMov: Optional[str] = Field(default=None, max_length=2, foreign_key="T_TipoMovi.TipoMov")
+    CodUsu: Optional[str] = Field(default=None, max_length=10, foreign_key="t_usuario.CodUsu")
+    TipoMov: Optional[str] = Field(default=None, max_length=2, foreign_key="t_tipomovi.TipoMov")
     MonOpe: Optional[Decimal] = Field(default=None, max_digits=10, decimal_places=2)
-    Estado: Optional[str] = Field(default=None, max_length=1, foreign_key="T_Estado.Estado")
+    Estado: Optional[str] = Field(default=None, max_length=1, foreign_key="t_estado.Estado")

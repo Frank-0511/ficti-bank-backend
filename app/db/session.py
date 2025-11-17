@@ -22,7 +22,7 @@ else:
 #engine = create_engine(DATABASE_URL, echo=True) ## usar esto cuando no se vaya a usar ssl
 
 def create_db_and_tables():
-    SQLModel.metadata.create_all(engine)
+    pass
 
 
 def get_session():

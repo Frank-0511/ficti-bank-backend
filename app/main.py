@@ -1,29 +1,25 @@
-from fastapi import FastAPI, Depends
-from fastapi.security import OAuth2PasswordBearer , OAuth2PasswordRequestForm
+from fastapi import FastAPI
 from app.api.v1.api import api_router
-from app.db.session import create_db_and_tables
 import logging
 
 logger = logging.getLogger(__name__)
 
-app = FastAPI()
-
 app = FastAPI(title="Sistema Bancario API")
 
+# ❗ No crear tablas automáticamente
 def safe_create_db_and_tables():
     try:
-        
-        # create_db_and_tables()
-        logger.info("✅ Tablas creadas o ya existentes.")
+        # create_db_and_tables()   ← NO USAR SQLModel.create_all()
+        logger.info("🔵 Modo producción/desarrollo: NO se crean tablas automáticamente.")
     except Exception as e:
-        logger.warning(f"⚠️ No se pudo conectar a la base de datos al iniciar: {e}")
-        
+        logger.warning(f"⚠️ No se pudo conectar a la BD al iniciar: {e}")
+
 @app.on_event("startup")
 def on_startup():
-    # Esta línea crea las tablas en la base de datos si no existen
-    # En un entorno de producción, se suele usar un sistema de migraciones como Alembic
-    safe_create_db_and_tables()
+    # ❗ NO LLAMAR safe_create_db_and_tables
+    logger.info("🚀 Sistema Bancario API iniciado correctamente (sin crear tablas).")
 
+# Registrar rutas
 app.include_router(api_router, prefix="/api/v1")
 
 @app.get("/")
