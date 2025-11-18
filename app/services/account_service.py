@@ -1,10 +1,11 @@
-# app/services/cuenta_service.py
+# app/services/account_service.py
 
 from typing import Dict, Any, Optional, List
 from sqlmodel import Session
 from sqlalchemy import text, Row
-# from app.schemas.account import CuentaCreationData 
 from app.schemas.account import CuentaCreationData, CuentaDetailsDTO, CuentaEstadoUpdate
+# 🛑 NUEVAS IMPORTACIONES REQUERIDAS para Depósito y Retiro
+from app.schemas.transaction import DepositoRequest, RetiroRequest
 
 
 def insertar_nueva_cuenta_sp(session: Session, datos: CuentaCreationData) -> Dict[str, Any]:
@@ -46,8 +47,6 @@ def insertar_nueva_cuenta_sp(session: Session, datos: CuentaCreationData) -> Dic
 
         # 4. VERIFICACIÓN DE ÉXITO/ERROR (La parte modificada)
         
-        # Si el mensaje NO empieza con "Éxito:", asumimos que es un error 
-        # (ya sea un "Error:" explícito o un mensaje de error no esperado).
         if not output_message.lower().startswith('éxito'): 
             
             # Si el SP devolvió cualquier cosa que no sea un éxito, lo tratamos como error
@@ -73,12 +72,9 @@ def listar_cuentas_sp(session: Session, cod_usu_input: Optional[str]) -> List[Cu
     
     try:
         # 1. Ejecutamos la llamada
-        # Usar .mappings().all() asegura que los resultados sean diccionarios
-        # con los nombres de columna como claves, lo que facilita el mapeo.
         results = session.execute(query, {"p_CodUsu": p_cod_usu}).mappings().all()
         
         # 2. Mapeamos cada diccionario/fila (Row) al DTO
-        # Convertimos la lista de Rows/dicts a una lista de objetos CuentaDetailsDTO
         lista_cuentas_dto = [CuentaDetailsDTO.model_validate(row) for row in results]
         
         return lista_cuentas_dto
@@ -134,3 +130,66 @@ def actualizar_estado_cuenta_sp(session: Session, datos: CuentaEstadoUpdate) -> 
     except Exception as e:
         session.rollback()
         raise e
+
+# ===============================================================
+# FUNCIONES DE SIMULACIÓN (Depósito y Retiro)
+# ===============================================================
+
+def insertar_deposito_sp(session: Session, datos: DepositoRequest) -> Dict[str, Any]:
+    """
+    SIMULACIÓN: Registra el depósito aplicando la lógica de embargo/desembargo 
+    en memoria para permitir la prueba del endpoint. (NO HACE LLAMADAS A DB)
+    """
+    
+    # Simulación de verificación de cuenta
+    if datos.Cuenta == "CUENTA_INVALIDA":
+        raise ValueError("Error: Cuenta bancaria no encontrada.")
+        
+    # --- LÓGICA DE SIMULACIÓN DE EMBARGO/DESEMBARGO ---
+    
+    tiene_embargo = True if datos.Cuenta == "CUE0002" else False
+    
+    if tiene_embargo:
+        # 🧪 Caso de Prueba: CUE0002 (El depósito va al embargo)
+        mensaje_final = f"Éxito: Depósito de {datos.Monto} aplicado a SALDO EMBARGADO."
+        nuevo_saldo_disponible = 100.00
+        nuevo_saldo_embargado = 2500.00 + datos.Monto
+    else:
+        # 🧪 Caso de Prueba: CUE0001 (El depósito va al disponible)
+        mensaje_final = f"Éxito: Depósito de {datos.Monto} aplicado a SALDO DISPONIBLE."
+        nuevo_saldo_disponible = 1000.00 + datos.Monto
+        nuevo_saldo_embargado = 0.00 
+        
+    # --- Devolver el resultado de la simulación ---
+    return {
+        "NroTransaccion": "TXD" + str(hash(datos.Cuenta))[:6],
+        "MensajeSP": mensaje_final,
+        "NuevoSaldoDisponible": nuevo_saldo_disponible,
+        "NuevoSaldoEmbargado": nuevo_saldo_embargado
+    }
+
+def insertar_retiro_sp(session: Session, datos: RetiroRequest) -> Dict[str, Any]:
+    """
+    SIMULACIÓN: Llama al SP para el retiro aplicando la lógica de Embargo, Saldo, Sobregiro
+    en memoria para permitir la prueba del endpoint. (NO HACE LLAMADAS A DB)
+    """
+    
+    # 1. SIMULACIÓN DE CASOS DE FALLO CRÍTICOS (EMBARGO/PLAZO/SALDO)
+    if datos.Cuenta == "CUE9999": # Prueba de Embargo Total
+        raise ValueError("Error: Retiro no autorizado. Cuenta con embargo total activo.")
+    
+    if datos.Cuenta == "CUE8888" and datos.Monto > 500: # Prueba de Saldo Insuficiente
+        raise ValueError("Error: El monto a retirar excede el saldo disponible (S/500).")
+        
+    if datos.Cuenta == "CUE7777": # Prueba de Cuenta a Plazo Fijo
+        raise ValueError("Error: Retiro no permitido. Cuenta a plazo fijo no ha cumplido el término.")
+        
+    # --- SIMULACIÓN DE ÉXITO (Si no falló en los casos anteriores) ---
+    
+    # 2. Devolver el resultado de la simulación
+    return {
+        "MensajeSP": "Éxito: Retiro procesado correctamente.",
+        "NroTransaccion": "TXR" + str(hash(datos.Cuenta))[:6],
+        "NuevoSaldoDisponible": 10000.00 - datos.Monto, 
+        "NuevoSaldoEmbargado": 0.00
+    }
