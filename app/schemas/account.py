@@ -47,7 +47,13 @@ class CuentaEstadoUpdate(SQLModel):
     nro_cta: str = Field(..., max_length=20, description="Número único de la cuenta a modificar.")
     
     # Usamos Literal para restringir los valores aceptados, reforzando la regla CHAR(1) del SP.
-    nuevo_estado: Literal['A', 'I', 'B'] = Field(..., description="Nuevo estado de la cuenta ('A': Activa, 'I': Inactiva, 'B': Bloqueada).")
+    nuevo_estado: Literal['A', 'I', 'B', 'N'] = Field(
+        ..., 
+        description=(
+            "Nuevo estado de la cuenta. Códigos válidos: "
+            "'A' (Activa), 'I' (Inactiva), 'B' (Bloqueada), 'N' (Anulado)."
+        )
+    )    
     
     cod_usu_modifica: str = Field(..., max_length=10, description="Código del usuario que autoriza el cambio (debe ser un administrador o rol autorizado).")
     

@@ -4,14 +4,145 @@ from fastapi import APIRouter, HTTPException, status, Query
 import traceback 
 from typing import Optional, List
 
+
 # Importaciones de dependencias (asume que existen)
 from app.api.v1.deps import SessionDep 
 from app.schemas.account import CuentaCreationData, CuentaDetailsDTO, CuentaEstadoUpdate 
-from app.services import account_service
-from app.services.account_service import listar_cuentas_sp, actualizar_estado_cuenta_sp
-from app.schemas.util import APIResponse
-router = APIRouter()
+from app.schemas.transaction import DepositoRequest, RetiroRequest, TransaccionDetailsDTO
+from app.services import account_service 
+from app.schemas.util import APIResponse 
+router = APIRouter()                     
 
+@router.post(
+    "/deposito",
+    response_model=APIResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Realiza un depósito de dinero con validación de monto y embargo."
+)
+def depositar_dinero(
+    *,
+    session: SessionDep,
+    datos_deposito: DepositoRequest
+):
+    try:
+        limite = 2000.00
+        
+        # --- 1. Lógica CRÍTICA de Autorización (VERIFICADA) ---
+        if datos_deposito.Monto > limite and datos_deposito.Moneda == "PEN":
+            if not datos_deposito.Autorizacion:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN, 
+                    detail=APIResponse(
+                        mensaje=f"Depósito de S/{datos_deposito.Monto} excede el límite. Se requiere autorización.",
+                        codigo="AUTH-REQ",
+                        status_code=status.HTTP_403_FORBIDDEN
+                    ).model_dump()
+                )
+        
+        # --- 2. LLAMADA AL SERVICIO CORREGIDA ---
+        try:
+            # CORRECCIÓN: Usar account_service.insertar_deposito_sp
+            resultado_sp = account_service.insertar_deposito_sp( 
+                session=session, datos=datos_deposito
+            )
+        except ValueError as ve:
+            # Manejo de Errores de Negocio devueltos por el Servicio/SP
+            error_message = str(ve)
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=APIResponse(
+                    mensaje=error_message,
+                    codigo="DEP-400",
+                    status_code=status.HTTP_400_BAD_REQUEST
+                ).model_dump()
+            )
+            
+        # 3. Respuesta de Éxito (Usando los datos REALES del SP)
+        return APIResponse(
+            mensaje=resultado_sp["MensajeSP"],
+            codigo=resultado_sp["NroTransaccion"],
+            status_code=status.HTTP_200_OK,
+            result={
+                "NuevoSaldoDisponible": resultado_sp["NuevoSaldoDisponible"],
+                "NuevoSaldoEmbargado": resultado_sp["NuevoSaldoEmbargado"]
+            }
+        )
+    
+    except HTTPException as h_e:
+        raise h_e 
+        
+    except Exception as e:
+        import traceback; traceback.print_exc() 
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=APIResponse(
+                mensaje="Ocurrió un error interno del servidor durante el depósito.",
+                codigo="SYS-500",
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+            ).model_dump()
+        )
+
+@router.post(
+    "/retiro",
+    response_model=APIResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Realiza un retiro de dinero con validaciones de embargo, sobregiro y saldo."
+)
+def retirar_dinero(
+    *,
+    session: SessionDep,
+    datos_retiro: RetiroRequest
+):
+    try:
+        # 1. LLAMADA AL SERVICIO CORREGIDA
+        try:
+            # CORRECCIÓN: Usar account_service.insertar_retiro_sp
+            resultado_sp = account_service.insertar_retiro_sp( 
+                session=session, datos=datos_retiro
+            )
+        except ValueError as ve:
+            # --- CORRECCIÓN DE ERROR 500: Lanza HTTPException aquí ---
+            error_message = str(ve)
+            
+            # Patrón para devolver 403 (Embargo/Plazo) o 400 (Saldo Insuficiente)
+            if "embargo" in error_message.lower() or "plazo" in error_message.lower():
+                error_code = status.HTTP_403_FORBIDDEN # Para errores que prohíben la acción
+            else:
+                error_code = status.HTTP_400_BAD_REQUEST # Para errores de datos o insuficiencia
+
+            raise HTTPException(
+                status_code=error_code,
+                detail=APIResponse(
+                    mensaje=error_message,
+                    codigo="RET-FAIL",
+                    status_code=error_code
+                ).model_dump()
+            )
+            
+        # 2. Respuesta de Éxito
+        return APIResponse(
+            mensaje=resultado_sp["MensajeSP"],
+            codigo=resultado_sp["NroTransaccion"],
+            status_code=status.HTTP_200_OK,
+            result={
+                "NuevoSaldoDisponible": resultado_sp["NuevoSaldoDisponible"],
+                "NuevoSaldoEmbargado": resultado_sp["NuevoSaldoEmbargado"]
+            }
+        )
+    
+    except HTTPException as h_e:
+        raise h_e # Propaga los errores 403/400 que acabamos de lanzar
+        
+    except Exception as e:
+        import traceback; traceback.print_exc() 
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=APIResponse(
+                mensaje="Ocurrió un error interno del servidor durante el retiro.",
+                codigo="SYS-500",
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+            ).model_dump()
+        )
 
 @router.post(
     "/crearCuentasBancarias",
