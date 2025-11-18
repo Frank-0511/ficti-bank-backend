@@ -171,3 +171,36 @@ def register_staff_sp(session: Session, user_data: StaffRegistrationData) -> Dic
         "Rol": user_data.Rol,
         "MensajeSP": f"Éxito: Usuario interno '{user_data.Usuario}' registrado con Rol '{user_data.Rol}'."
     }
+from app.schemas.user import StaffRegistrationData
+from sqlmodel import Session
+from passlib.context import CryptContext
+from typing import Dict, Any
+
+# Es posible que ya tengas un contexto de hashing, pero lo definimos aquí por seguridad.
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+def register_staff_sp(session: Session, user_data: StaffRegistrationData) -> Dict[str, Any]:
+    """
+    SIMULACIÓN: Hashea la contraseña y llama al SP de la BD para registrar el usuario interno.
+    """
+    
+    # 1. Simulación de Hashing (si usas passlib)
+    hashed_password = pwd_context.hash(user_data.Password)
+    
+    # 2. Lógica de Llamada al SP de la BD (DEBES IMPLEMENTAR ESTO CON TU SP REAL)
+    # Por ahora, simularemos un éxito.
+    
+    # Si quisieras llamar al SP, el código sería similar a:
+    # query = text("CALL sp_RegistrarUsuarioInterno(:usuario, :hash, :rol, ...)")
+    # session.execute(query, { "usuario": user_data.Usuario, "hash": hashed_password, "rol": user_data.Rol, ... })
+    
+    # Simulación de Éxito:
+    if user_data.Usuario == "fail_test":
+        raise ValueError("El usuario ya existe en la base de datos.")
+
+    return {
+        "CodUsu": "USR" + user_data.Rol + str(hash(user_data.Usuario))[:4],
+        "Usuario": user_data.Usuario,
+        "Rol": user_data.Rol,
+        "MensajeSP": f"Éxito: Usuario interno '{user_data.Usuario}' registrado con Rol '{user_data.Rol}'."
+    }
